@@ -35,7 +35,7 @@ ARTIFACTS_DIR = BASE_DIR / "artifacts"
 
 def setup_logging(level: str = "INFO") -> None:
     """Configure logging for the pipeline.
-    
+
     Args:
         level: Logging level string (DEBUG, INFO, WARNING, ERROR).
     """
@@ -55,26 +55,24 @@ def ensure_directories() -> None:
 
 def run_pipeline(
     n_employees: int = 500,
-    test_size: float = 0.2,
     random_state: int = 42,
     output_format: str = "json",
     save_artifacts: bool = True,
 ) -> Dict[str, Any]:
     """Execute the full HR analytics pipeline.
-    
+
     Steps:
         1. Load / generate HR data
         2. Run exploratory data analysis
         3. Train attrition prediction model
         4. Generate and save reports
-    
+
     Args:
         n_employees: Number of synthetic employees to generate.
-        test_size: Fraction of data reserved for testing.
         random_state: Random seed for reproducibility.
         output_format: Report output format ('json' or 'csv').
         save_artifacts: Whether to persist artifacts to disk.
-        
+
     Returns:
         Dictionary with pipeline results and metrics.
     """
@@ -150,18 +148,23 @@ def run_pipeline(
     # ------------------------------------------------------------------
     logger.info("[3/4] Training attrition model...")
     model = AttritionModel(random_state=random_state)
-    metrics = model.fit(df, test_size=test_size)
+    model.train(df)
+    metrics = model.evaluate(df)
     results["model"] = {
-        "accuracy": metrics.get("accuracy"),
-        "f1_score": metrics.get("f1"),
         "roc_auc": metrics.get("roc_auc"),
+        "classification_report": metrics.get("classification_report"),
     }
     logger.info(
-        "  Model metrics - Accuracy: %.4f | F1: %.4f | ROC-AUC: %.4f",
-        metrics.get("accuracy", 0),
-        metrics.get("f1", 0),
+        "  Model ROC-AUC: %.4f",
         metrics.get("roc_auc", 0),
     )
+
+    # Feature importance
+    try:
+        fi = model.feature_importance()
+        results["feature_importance"] = fi.head(10).to_dict(orient="records")
+    except Exception as exc:
+        logger.warning("  Feature importance skipped: %s", exc)
 
     if save_artifacts:
         model_path = MODELS_DIR / f"attrition_model_{run_id}.pkl"
