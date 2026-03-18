@@ -20,7 +20,6 @@ from sklearn.metrics import (
     classification_report,
     roc_auc_score,
 )
-from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
