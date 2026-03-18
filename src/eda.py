@@ -144,7 +144,7 @@ class HRExploratoryAnalysis:
             DataFrame with group, total, attrition_count, attrition_rate.
         """
         df = self.df.copy()
-        if df[attrition_col].dtype == object:
+        if not pd.api.types.is_numeric_dtype(df[attrition_col]):
             df[attrition_col] = (df[attrition_col] == "Yes").astype(int)
 
         grouped = (
