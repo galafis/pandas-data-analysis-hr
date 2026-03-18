@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
-from src.data_loader import IBM_COLUMNS, _generate_synthetic_hr, load_hr_data
+from src.data_loader import _generate_synthetic_hr, load_hr_data
 
 
 class TestGenerateSyntheticHR:
