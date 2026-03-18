@@ -3,166 +3,329 @@
 [![CI](https://github.com/galafis/pandas-data-analysis-hr/actions/workflows/ci.yml/badge.svg)](https://github.com/galafis/pandas-data-analysis-hr/actions)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 ---
 
-## Executive Summary / Sumário Executivo
+> **EN:** End-to-end People Analytics pipeline built on Python and Pandas. Covers exploratory data analysis (EDA), attrition prediction, salary equity audit, and workforce segmentation. Production-ready pipeline with Docker, CI and bilingual docs.
 
-**EN:** End-to-end People Analytics pipeline built on Python and Pandas. Covers exploratory data analysis (EDA), attrition prediction, salary equity audit, and workforce segmentation. Designed to map directly to HR Tech platforms such as **TOTVS RH** and **SAP SuccessFactors**.
-
-**PT-BR:** Pipeline completo de People Analytics com Python e Pandas. Abrange análise exploratória (EDA), predição de turnover, auditoria de equidade salarial e segmentação da força de trabalho. Pensado para integrar plataformas de RH como **TOTVS RH** e **SAP SuccessFactors**.
+> **PT-BR:** Pipeline completo de People Analytics com Python e Pandas. Abrange analise exploratoria de dados (EDA), predicao de turnover, auditoria de equidade salarial e segmentacao da forca de trabalho. Pipeline production-ready com Docker, CI e documentacao bilingue.
 
 ---
 
-## Business Problem / Problema de Negócio
+## Table of Contents / Sumario
 
-**EN:** HR teams struggle to answer basic analytical questions — "Why do high performers leave?", "Is our pay gap within legal bounds?", "Which teams are at attrition risk?" — without dedicated data infrastructure. This project builds a reusable, auditable analytics layer on top of the IBM HR Analytics dataset (synthetic, publicly available).
-
-**PT-BR:** Times de RH precisam de respostas analíticas rápidas sobre retenção, equidade e risco, mas raramente têm infraestrutura de dados dedicada. Este projeto constrói uma camada analítica reutilizável e auditável sobre o IBM HR Analytics dataset (sintético, público).
+- [Architecture / Arquitetura](#architecture--arquitetura)
+- [Features / Funcionalidades](#features--funcionalidades)
+- [Quick Start / Inicio Rapido](#quick-start--inicio-rapido)
+- [Project Structure / Estrutura do Projeto](#project-structure--estrutura-do-projeto)
+- [Usage / Uso](#usage--uso)
+- [Testing / Testes](#testing--testes)
+- [Docker](#docker)
+- [API Reference / Referencia da API](#api-reference--referencia-da-api)
+- [Contributing / Contribuicao](#contributing--contribuicao)
+- [License / Licenca](#license--licenca)
 
 ---
 
 ## Architecture / Arquitetura
 
 ```mermaid
-flowchart TD
-    A["IBM HR Dataset\n(CSV / sintético)"] --> B[data_loader.py]
-    B --> C[eda.py\nExploratory Analysis]
-    B --> D[feature_engineering.py\nEncode + Scale]
-    D --> E[attrition_model.py\nClassifier]
-    D --> F[salary_equity.py\nEquity Audit]
-    E --> G[reports/attrition_report.json]
-    F --> H[reports/equity_report.json]
-    C --> I[reports/eda_summary.json]
+graph TD
+    A[Data Source<br>Synthetic IBM HR-style] --> B[data_loader.py]
+    B --> C[pandas DataFrame<br>500+ employees x 35 features]
+    C --> D[eda.py<br>Exploratory Analysis]
+    C --> E[attrition_model.py<br>RandomForest + SMOTE]
+    D --> F[Statistical Report]
+    D --> G[Salary Equity Gap]
+    D --> H[Outlier Detection]
+    E --> I[Trained Model .pkl]
+    E --> J[Feature Importances]
+    F & G & I --> K[pipeline.py<br>Orchestrator]
+    K --> L[JSON Reports<br>reports/]
+    K --> M[Model Artifacts<br>models/]
+
+    style A fill:#e1f5fe
+    style K fill:#fff3e0
+    style L fill:#e8f5e9
+    style M fill:#e8f5e9
+```
+
+```mermaid
+sequenceDiagram
+    participant U as User / Docker
+    participant P as pipeline.py
+    participant DL as data_loader
+    participant EDA as eda.py
+    participant ML as attrition_model
+
+    U->>P: run_pipeline(n=500)
+    P->>DL: load_hr_data(500)
+    DL-->>P: DataFrame
+    P->>EDA: HRExploratoryAnalysis(df)
+    EDA-->>P: stats + correlations + outliers
+    P->>EDA: salary_equity_analysis()
+    EDA-->>P: gender pay gap report
+    P->>ML: AttritionModel().train(df)
+    ML-->>P: fitted model
+    P->>ML: model.evaluate(df)
+    ML-->>P: ROC-AUC + classification report
+    P-->>U: JSON results + artifacts
 ```
 
 ---
 
-## Data Model / Modelo de Dados
+## Features / Funcionalidades
 
-| Column | Type | Description |
-|---|---|---|
-| `EmployeeNumber` | int | Unique employee ID |
-| `Age` | int | Employee age |
-| `Department` | str | Department name |
-| `JobRole` | str | Job role title |
-| `MonthlyIncome` | float | Monthly salary (USD) |
-| `Attrition` | str | Yes/No — left the company |
-| `YearsAtCompany` | int | Tenure in years |
-| `PerformanceRating` | int | 1–4 rating scale |
-| `Gender` | str | Gender |
-| `OverTime` | str | Yes/No — works overtime |
-| `JobSatisfaction` | int | 1–4 satisfaction scale |
+### EN
 
-> Fonte / Source: [IBM HR Analytics Employee Attrition Dataset](https://www.kaggle.com/datasets/pavansubhasht/ibm-hr-analytics-attrition-dataset) — CC0 Public Domain.
+| Feature | Description |
+|---------|-------------|
+| **Synthetic Data Generation** | IBM HR Attrition-style dataset with 35 features per employee |
+| **Exploratory Data Analysis** | Descriptive statistics, skewness, kurtosis, missing data profiling |
+| **Correlation Analysis** | Pearson/Spearman/Kendall matrices, top-N correlation pairs |
+| **Attrition Modeling** | RandomForest classifier with SMOTE for class imbalance |
+| **Salary Equity Audit** | Gender pay gap analysis with optional control variables (dept, level) |
+| **Outlier Detection** | IQR-based outlier flagging across all numeric features |
+| **Data Quality Report** | Comprehensive dtype, null, unique value profiling |
+| **Feature Importance** | Ranked feature importances from the trained model |
+| **Pipeline Orchestration** | End-to-end workflow with artifact persistence |
+| **Docker Support** | Multi-stage Dockerfile for reproducible execution |
+| **CI/CD** | GitHub Actions with lint + test on every push |
+| **Bilingual Docs** | Full documentation in English and Portuguese |
 
----
+### PT-BR
 
-## Methodology / Metodologia
-
-1. **EDA** — distribuições, correlações, outliers, análise de desequilíbrio de classes
-2. **Feature Engineering** — encoding de variáveis categóricas, normalização, criação de features de tenure e performance
-3. **Attrition Modeling** — Random Forest + XGBoost com SMOTE para balanceamento de classes
-4. **Salary Equity Audit** — regressão linear por gênero/raça controlando cargo e departamento (método Oaxaca-Blinder simplificado)
-5. **Workforce Segmentation** — K-Means clustering por perfil de engajamento
-
----
-
-## Results / Resultados
-
-| Metric | Value |
-|---|---|
-| Attrition Recall (minority class) | ~0.72 |
-| ROC-AUC | ~0.84 |
-| Top Attrition Driver | OverTime = Yes |
-| Pay Gap Detected | ~8% raw (controlled ~3%) |
+| Funcionalidade | Descricao |
+|---------------|-----------|
+| **Geracao de Dados Sinteticos** | Dataset estilo IBM HR Attrition com 35 features por funcionario |
+| **Analise Exploratoria** | Estatisticas descritivas, assimetria, curtose, perfil de dados faltantes |
+| **Analise de Correlacao** | Matrizes Pearson/Spearman/Kendall, top-N pares correlacionados |
+| **Modelagem de Attrition** | Classificador RandomForest com SMOTE para desbalanceamento |
+| **Auditoria de Equidade Salarial** | Analise de gap salarial por genero com variaveis de controle |
+| **Deteccao de Outliers** | Deteccao baseada em IQR em todas as features numericas |
+| **Relatorio de Qualidade** | Perfil completo de dtype, nulos e valores unicos |
+| **Importancia de Features** | Features ranqueadas pelo modelo treinado |
+| **Orquestracao do Pipeline** | Workflow end-to-end com persistencia de artefatos |
+| **Suporte Docker** | Dockerfile multi-stage para execucao reproduzivel |
+| **CI/CD** | GitHub Actions com lint + teste em cada push |
+| **Docs Bilingue** | Documentacao completa em Ingles e Portugues |
 
 ---
 
-## How this connects to HR Tech / People Analytics
+## Quick Start / Inicio Rapido
 
-Este projeto replica as análises centrais de uma plataforma de **People Analytics** como a **TOTVS RH**:
+### Prerequisites / Pre-requisitos
 
-- **Painel de Retenção** → modelo de attrition por departamento
-- **Audit de Equidade Salarial** → relatório por gênero e cargo
-- **Dashboard de Engajamento** → segmentação K-Means
-- **Business Impact:** redução de 15% no turnover representa economia de ~1,5x o salário anual por colaborador retido
+- Python 3.10+
+- pip or Docker
 
----
-
-## Limitations / Limitações
-
-- Dataset IBM é sintético; resultados não refletem uma empresa real
-- Análise de equidade salarial não substitui auditoria jurídica formal
-- Modelos de classificação devem ser recalibrados trimestralmente
-
----
-
-## Ethical Considerations / Considerações Éticas
-
-- Nenhum dado individual real é utilizado
-- Predições de attrition NÃO devem ser usadas para demissão automática
-- Auditoria de equidade deve ser revisada por equipe jurídica antes de ação corretiva
-
----
-
-## How to Run / Como Executar
-
-### Local
+### Installation / Instalacao
 
 ```bash
+# Clone the repository / Clone o repositorio
 git clone https://github.com/galafis/pandas-data-analysis-hr.git
 cd pandas-data-analysis-hr
-cp .env.example .env
-make install
-make run
+
+# Create virtual environment / Crie o ambiente virtual
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# venv\Scripts\activate   # Windows
+
+# Install dependencies / Instale as dependencias
+pip install -r requirements.txt
 ```
 
-### Docker
+### Run the Pipeline / Execute o Pipeline
 
 ```bash
-docker-compose up --build pipeline
-```
+# Run with default settings (500 employees)
+python -m src.pipeline
 
-### Tests
+# Custom number of employees
+N_EMPLOYEES=1000 python -m src.pipeline
 
-```bash
-make test
+# With debug logging
+LOG_LEVEL=DEBUG python -m src.pipeline
 ```
 
 ---
 
-## Project Structure
+## Project Structure / Estrutura do Projeto
 
 ```
 pandas-data-analysis-hr/
-├── src/
-│   ├── config.py
-│   ├── data_loader.py
-│   ├── eda.py
-│   ├── feature_engineering.py
-│   ├── attrition_model.py
-│   ├── salary_equity.py
-│   └── pipeline.py
-├── tests/
-├── data/
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # CI/CD pipeline
 ├── docs/
-├── .github/workflows/ci.yml
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-├── requirements.txt
-└── .env.example
+│   └── architecture.md         # Architecture docs with Mermaid
+├── src/
+│   ├── __init__.py             # Package init
+│   ├── data_loader.py          # Synthetic HR data generator
+│   ├── eda.py                  # Exploratory data analysis
+│   ├── attrition_model.py      # ML attrition classifier
+│   └── pipeline.py             # End-to-end orchestrator
+├── tests/
+│   ├── __init__.py
+│   ├── test_data_loader.py     # Data loader tests
+│   ├── test_eda.py             # EDA module tests (16 tests)
+│   └── test_attrition_model.py # Model tests (10 tests)
+├── data/                       # Generated at runtime
+├── models/                     # Saved model artifacts
+├── reports/                    # Generated JSON reports
+├── .env.example                # Environment variables template
+├── Dockerfile                  # Multi-stage Docker build
+├── Makefile                    # Dev commands
+├── requirements.txt            # Python dependencies
+├── LICENSE                     # MIT License
+└── README.md                   # This file
 ```
 
 ---
 
-## Interview Talking Points
+## Usage / Uso
 
-- "Construí um pipeline de People Analytics do zero, do EDA até modelo de retenção em produção"
-- "Implementei auditoria de equidade salarial com controle estatístico de variáveis de confusão"
-- "O modelo de attrition usa SMOTE para lidar com desequilíbrio de classes real em dados de RH"
+### Python API
 
-## Portfolio Positioning
+```python
+from src.data_loader import load_hr_data
+from src.eda import HRExploratoryAnalysis
+from src.attrition_model import AttritionModel
 
-Este projeto demonstra: Python avançado, raciocínio estatístico aplicado a negócios, sensibilidade a questões de equidade, e capacidade de entrega de produto analítico completo.
+# 1. Load data / Carregar dados
+df = load_hr_data(n_employees=500)
+
+# 2. Exploratory Analysis / Analise Exploratoria
+eda = HRExploratoryAnalysis(df)
+stats = eda.summary_statistics()
+correlations = eda.top_correlations(n=10)
+outliers = eda.detect_outliers_iqr()
+
+# 3. Salary Equity / Equidade Salarial
+equity = eda.salary_equity_analysis(
+    salary_col="MonthlyIncome",
+    group_col="Gender",
+    control_cols=["Department", "JobLevel"]
+)
+print(f"Gender pay gap: {equity['overall']['gap_pct']:.2f}%")
+
+# 4. Attrition rates / Taxas de Attrition
+rates = eda.attrition_rate_by("Department")
+
+# 5. Train model / Treinar modelo
+model = AttritionModel(random_state=42)
+model.train(df)
+metrics = model.evaluate(df)
+print(f"ROC-AUC: {metrics['roc_auc']:.4f}")
+
+# 6. Feature importance
+fi = model.feature_importance()
+print(fi.head(10))
+
+# 7. Save/Load model / Salvar/Carregar modelo
+model.save("models/my_model.pkl")
+loaded = AttritionModel.load("models/my_model.pkl")
+```
+
+### Makefile Commands
+
+```bash
+make install    # Install dependencies
+make test       # Run pytest
+make lint       # Run flake8
+make run        # Run pipeline
+make docker     # Build Docker image
+make clean      # Remove artifacts
+```
+
+---
+
+## Testing / Testes
+
+```bash
+# Run all tests / Executar todos os testes
+pytest tests/ -v
+
+# Run with coverage / Executar com cobertura
+pytest tests/ -v --cov=src --cov-report=term-missing
+
+# Run specific test file / Executar arquivo especifico
+pytest tests/test_eda.py -v
+pytest tests/test_attrition_model.py -v
+```
+
+### Test Coverage
+
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| `data_loader.py` | test_data_loader.py | Data loading, schema validation |
+| `eda.py` | test_eda.py | 16 tests: stats, correlations, equity, outliers |
+| `attrition_model.py` | test_attrition_model.py | 10 tests: train, predict, save/load, encoding |
+
+---
+
+## Docker
+
+```bash
+# Build / Construir
+docker build -t pandas-hr-analytics .
+
+# Run pipeline / Executar pipeline
+docker run --rm pandas-hr-analytics
+
+# Run with custom settings / Executar com config customizada
+docker run --rm -e N_EMPLOYEES=1000 -e LOG_LEVEL=DEBUG pandas-hr-analytics
+
+# Mount volume for artifacts / Montar volume para artefatos
+docker run --rm -v $(pwd)/output:/app/reports pandas-hr-analytics
+```
+
+---
+
+## API Reference / Referencia da API
+
+### `HRExploratoryAnalysis`
+
+| Method | Description / Descricao |
+|--------|------------------------|
+| `summary_statistics()` | Extended descriptive stats with skew/kurtosis |
+| `categorical_summary()` | Value counts and proportions for categorical cols |
+| `correlation_matrix(method, threshold)` | Correlation matrix with optional threshold filter |
+| `top_correlations(n, method)` | Top-N strongest feature correlations |
+| `attrition_rate_by(group_col)` | Attrition rate grouped by any categorical column |
+| `salary_equity_analysis(salary_col, group_col, control_cols)` | Pay gap analysis with optional controls |
+| `detect_outliers_iqr(columns, factor)` | IQR-based outlier detection |
+| `data_quality_report()` | Comprehensive data quality profiling |
+| `generate_report()` | Full EDA report as dictionary |
+
+### `AttritionModel`
+
+| Method | Description / Descricao |
+|--------|------------------------|
+| `train(df)` | Fit RandomForest with SMOTE on HR data |
+| `predict_proba(df)` | Return attrition probability per employee |
+| `evaluate(df)` | Compute ROC-AUC and classification report |
+| `feature_importance()` | Ranked feature importances DataFrame |
+| `save(path)` / `load(path)` | Persist/restore model with pickle |
+
+---
+
+## Contributing / Contribuicao
+
+**EN:** Contributions are welcome! Please open an issue or submit a pull request.
+
+**PT-BR:** Contribuicoes sao bem-vindas! Abra uma issue ou envie um pull request.
+
+---
+
+## License / Licenca
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Este projeto esta licenciado sob a Licenca MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+---
+
+**Author / Autor:** Gabriel Demetrios Lafis
+**GitHub:** [@galafis](https://github.com/galafis)
